@@ -13,7 +13,7 @@ const getCSSModuleLocalIdent = require("react-dev-utils/getCSSModuleLocalIdent")
 const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");
 const postcssNormalize = require("postcss-normalize");
 const safePostCssParser = require("postcss-safe-parser");
-
+const WasmPackPlugin = require('@wasm-tool/wasm-pack-plugin'); // devjev: Add WasmPackPlugin for WASM content.
 const getClientEnvironment = require("./env");
 const paths = require("./paths");
 
@@ -48,10 +48,10 @@ module.exports = webpackEnv => {
       isElement && require.resolve("to-string-loader"),
       !isElement && isDevelopment && require.resolve("style-loader"),
       !isElement &&
-        isProduction && {
-          loader: ExtractCssChunks.loader,
-          options: shouldUseRelativeAssetPaths ? { publicPath: "../../" } : {}
-        },
+      isProduction && {
+        loader: ExtractCssChunks.loader,
+        options: shouldUseRelativeAssetPaths ? { publicPath: "../../" } : {} // devjev: TODO this has to be properly parametrized
+      },
       {
         loader: require.resolve("css-loader"),
         options: cssOptions
@@ -171,9 +171,9 @@ module.exports = webpackEnv => {
           oneOf: [
             {
               test: [/\.bmp$/, /\.gif$/, /\.jpe?g$/, /\.png$/],
-              loader: require.resolve("url-loader"),
+              // devjev: don't use url-loader here because it fails for small files.
+              loader: require.resolve("file-loader"),
               options: {
-                limit: 10000,
                 name: "static/media/[name].[hash:8].[ext]"
               }
             },
@@ -378,7 +378,7 @@ module.exports = webpackEnv => {
             },
             {
               loader: require.resolve("file-loader"),
-              exclude: [/\.(js|mjs|jsx|ts|tsx)$/, /\.html$/, /\.json$/],
+              exclude: [/\.(js|mjs|jsx|ts|tsx|wasm)$/, /\.html$/, /\.json$/], // devjev: remove .wasm from this loader's scope.
               options: {
                 name: "static/media/[name].[hash:8].[ext]"
               }
@@ -388,6 +388,7 @@ module.exports = webpackEnv => {
       ]
     },
     plugins: [
+      new WasmPackPlugin({ crateDirectory: process.env.CRATE_ENV }),
       // Generates an `index.html` file with the <script> injected.
       new HtmlWebpackPlugin(
         Object.assign(
@@ -398,19 +399,19 @@ module.exports = webpackEnv => {
           },
           isProduction
             ? {
-                minify: {
-                  removeComments: true,
-                  collapseWhitespace: true,
-                  removeRedundantAttributes: true,
-                  useShortDoctype: true,
-                  removeEmptyAttributes: true,
-                  removeStyleLinkTypeAttributes: true,
-                  keepClosingSlash: true,
-                  minifyJS: true,
-                  minifyCSS: true,
-                  minifyURLs: true
-                }
+              minify: {
+                removeComments: true,
+                collapseWhitespace: true,
+                removeRedundantAttributes: true,
+                useShortDoctype: true,
+                removeEmptyAttributes: true,
+                removeStyleLinkTypeAttributes: true,
+                keepClosingSlash: true,
+                minifyJS: true,
+                minifyCSS: true,
+                minifyURLs: true
               }
+            }
             : undefined
         )
       ),
@@ -429,12 +430,12 @@ module.exports = webpackEnv => {
       // makes the discovery automatic so you don't have to restart.
       isDevelopment && new WatchMissingNodeModulesPlugin(paths.appNodeModules),
       isProduction &&
-        new ExtractCssChunks({
-          // Options similar to the same options in webpackOptions.output
-          // both options are optional
-          filename: "static/css/[name].[contenthash:8].css",
-          chunkFilename: "static/css/[name].[contenthash:8].chunk.css"
-        }),
+      new ExtractCssChunks({
+        // Options similar to the same options in webpackOptions.output
+        // both options are optional
+        filename: "static/css/[name].[contenthash:8].css",
+        chunkFilename: "static/css/[name].[contenthash:8].chunk.css"
+      }),
       // Generate a manifest file which contains a mapping of all asset filenames
       // to their corresponding output file so that tools can pick it up without
       // having to parse `index.html`.
@@ -442,7 +443,7 @@ module.exports = webpackEnv => {
         fileName: "asset-manifest.json",
         publicPath: publicPath,
         generate: (seed, files) => {
-          const manifestFiles = files.reduce(function(manifest, file) {
+          const manifestFiles = files.reduce(function (manifest, file) {
             manifest[file.name] = file.path;
             return manifest;
           }, seed);
@@ -458,19 +459,19 @@ module.exports = webpackEnv => {
       // Generate a service worker script that will precache, and keep up to date,
       // the HTML & assets that are part of the Webpack build.
       isProduction &&
-        new WorkboxWebpackPlugin.GenerateSW({
-          clientsClaim: true,
-          exclude: [/\.map$/, /asset-manifest\.json$/],
-          importWorkboxFrom: "cdn",
-          navigateFallback: publicUrl + "/index.html",
-          navigateFallbackBlacklist: [
-            // Exclude URLs starting with /_, as they're likely an API call
-            new RegExp("^/_"),
-            // Exclude URLs containing a dot, as they're likely a resource in
-            // public/ and not a SPA route
-            new RegExp("/[^/]+\\.[^/]+$")
-          ]
-        })
+      new WorkboxWebpackPlugin.GenerateSW({
+        clientsClaim: true,
+        exclude: [/\.map$/, /asset-manifest\.json$/],
+        importWorkboxFrom: "cdn",
+        navigateFallback: publicUrl + "/index.html",
+        navigateFallbackBlacklist: [
+          // Exclude URLs starting with /_, as they're likely an API call
+          new RegExp("^/_"),
+          // Exclude URLs containing a dot, as they're likely a resource in
+          // public/ and not a SPA route
+          new RegExp("/[^/]+\\.[^/]+$")
+        ]
+      })
     ].filter(Boolean),
     // Some libraries import Node modules but don't use them in the browser.
     // Tell Webpack to provide empty mocks for them so importing them works.
