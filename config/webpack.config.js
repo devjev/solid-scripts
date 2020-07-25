@@ -388,7 +388,7 @@ module.exports = webpackEnv => {
       ]
     },
     plugins: [
-      new WasmPackPlugin({ crateDirectory: process.env.CRATE_ENV }),
+      new WasmPackPlugin({ crateDirectory: process.env.CRATE_PATH }),
       // Generates an `index.html` file with the <script> injected.
       new HtmlWebpackPlugin(
         Object.assign(
