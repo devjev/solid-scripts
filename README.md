@@ -12,5 +12,5 @@ To include a Rust WebAssembly crate you would need to run with an additional
 WebPack environment variable:
 
 ```
-> npm run build --env.crateLocation="../my-wasm-crate"
+> solid-scripts-wasm build path/to/wasm/crate/pkg
 ```
